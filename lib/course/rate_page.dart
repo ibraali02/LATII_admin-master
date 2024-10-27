@@ -13,32 +13,53 @@ class RatePage extends StatefulWidget {
 class _RatePageState extends State<RatePage> {
   final List<Map<String, dynamic>> _ratings = [];
   final TextEditingController _weekTitleController = TextEditingController();
+  String? _documentId;
 
   @override
   void initState() {
     super.initState();
-    _loadExistingRatings(); // تحميل التقييمات الموجودة عند بدء الصفحة
+    _fetchDocumentId(); // جلب معرف الوثيقة عند بدء الصفحة
+  }
+
+  Future<void> _fetchDocumentId() async {
+    try {
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('starting_courses')
+          .where('courseId', isEqualTo: widget.courseId)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        setState(() {
+          _documentId = snapshot.docs.first.id; // الحصول على معرف الوثيقة الأولى المطابقة
+        });
+        _loadExistingRatings(); // تحميل التقييمات الموجودة بعد جلب معرف الوثيقة
+      }
+    } catch (e) {
+      print("Error fetching document ID: $e");
+    }
   }
 
   Future<void> _loadExistingRatings() async {
     // تحميل التقييمات الموجودة من Firestore
-    try {
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('starting_courses')
-          .doc(widget.courseId)
-          .collection('ratings')
-          .get();
+    if (_documentId != null) {
+      try {
+        QuerySnapshot snapshot = await FirebaseFirestore.instance
+            .collection('starting_courses')
+            .doc(_documentId!)
+            .collection('ratings')
+            .get();
 
-      setState(() {
-        _ratings.addAll(snapshot.docs.map((doc) {
-          return {
-            'title': doc['title'],
-            'rating': doc['rating'],
-          };
-        }).toList());
-      });
-    } catch (e) {
-      print("Error loading ratings: $e");
+        setState(() {
+          _ratings.addAll(snapshot.docs.map((doc) {
+            return {
+              'title': doc['title'],
+              'rating': doc['rating'],
+            };
+          }).toList());
+        });
+      } catch (e) {
+        print("Error loading ratings: $e");
+      }
     }
   }
 
@@ -74,12 +95,12 @@ class _RatePageState extends State<RatePage> {
 
   Future<void> _addWeek() async {
     String title = _weekTitleController.text.trim();
-    if (title.isNotEmpty) {
+    if (title.isNotEmpty && _documentId != null) {
       try {
         // إضافة الأسبوع الجديد إلى Firestore
         await FirebaseFirestore.instance
             .collection('starting_courses')
-            .doc(widget.courseId)
+            .doc(_documentId!)
             .collection('ratings')
             .add({'title': title, 'rating': 0}); // افتراضياً، التقييم 0
 
@@ -163,7 +184,7 @@ class _RatePageState extends State<RatePage> {
                               // حفظ التقييم في Firestore
                               FirebaseFirestore.instance
                                   .collection('starting_courses')
-                                  .doc(widget.courseId)
+                                  .doc(_documentId!)
                                   .collection('ratings')
                                   .where('title', isEqualTo: title)
                                   .get()

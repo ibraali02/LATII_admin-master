@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class VideoPage extends StatelessWidget {
-  const VideoPage({super.key, required String courseToken});
+  final String courseToken; // تعريف courseToken كحقل
+
+  const VideoPage({super.key, required this.courseToken});
 
   @override
   Widget build(BuildContext context) {
@@ -27,36 +32,137 @@ class VideoPage extends StatelessWidget {
         ),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.black), // لون الأيقونة أسود
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () => _showAddVideoDialog(context), // زر لإضافة فيديو
+          ),
+        ],
       ),
       body: Container(
         color: Colors.white, // الخلفية البيضاء
         padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            buildVideoCard(
-              context,
-              'Introduction to Flutter',
-              'Learn the basics of Flutter for mobile app development.',
-            ),
-            buildVideoCard(
-              context,
-              'State Management in Flutter',
-              'Explore state management techniques in Flutter.',
-            ),
-            buildVideoCard(
-              context,
-              'Building Responsive UIs',
-              'Design mobile apps that work on multiple screen sizes.',
-            ),
-            buildVideoCard(
-              context,
-              'Integrating APIs in Flutter',
-              'Learn how to connect your app to external APIs.',
-            ),
-          ],
+        child: FutureBuilder<List<Map<String, dynamic>>>(
+          future: _fetchVideos(), // جلب الفيديوهات من Firebase
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            } else {
+              final videos = snapshot.data!;
+              return ListView.builder(
+                itemCount: videos.length,
+                itemBuilder: (context, index) {
+                  return buildVideoCard(
+                    context,
+                    videos[index]['title'],
+                    videos[index]['description'],
+                  );
+                },
+              );
+            }
+          },
         ),
       ),
     );
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchVideos() async {
+    // جلب الفيديوهات من Firestore
+    try {
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('videos') // تأكد من اسم المجموعة
+          .get();
+
+      return snapshot.docs.map((doc) {
+        return {
+          'title': doc['title'],
+          'description': doc['description'],
+        };
+      }).toList();
+    } catch (e) {
+      print("Error fetching videos: $e");
+      return [];
+    }
+  }
+
+  void _showAddVideoDialog(BuildContext context) {
+    final TextEditingController titleController = TextEditingController();
+    final TextEditingController descriptionController = TextEditingController();
+    final ImagePicker _picker = ImagePicker();
+    File? videoFile;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Add Video'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(hintText: 'Video Title'),
+              ),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(hintText: 'Video Description'),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () async {
+                  // فتح معرض الصور لاختيار فيديو
+                  final pickedFile = await _picker.pickVideo(source: ImageSource.gallery);
+                  if (pickedFile != null) {
+                    videoFile = File(pickedFile.path);
+                  }
+                },
+                child: const Text('Select Video'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (videoFile != null) {
+                  _addVideo(
+                    titleController.text.trim(),
+                    descriptionController.text.trim(),
+                    videoFile!,
+                  );
+                }
+                Navigator.of(context).pop();
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _addVideo(String title, String description, File videoFile) async {
+    // إضافة الفيديو إلى Firestore
+    if (title.isNotEmpty && description.isNotEmpty) {
+      try {
+        // قم بتحميل الفيديو إلى Firebase Storage هنا
+        // بعد تحميل الفيديو، يمكنك إضافة سجل الفيديو إلى Firestore
+        await FirebaseFirestore.instance.collection('videos').add({
+          'title': title,
+          'description': description,
+          // يمكنك إضافة رابط الفيديو هنا بعد التحميل
+        });
+      } catch (e) {
+        print("Error adding video: $e");
+      }
+    }
   }
 
   Widget buildVideoCard(
@@ -102,7 +208,7 @@ class VideoPage extends StatelessWidget {
             Center( // توسيط الزر
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // Add video play functionality here
+                  // إضافة وظيفة تشغيل الفيديو هنا
                 },
                 icon: const Icon(Icons.play_arrow, color: Colors.white),
                 label: const Text(
