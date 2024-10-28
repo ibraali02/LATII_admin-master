@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'WeekDetailPage.dart';
 
 class RatePage extends StatefulWidget {
   final String courseId; // استقبل courseId من الصفحة السابقة
@@ -11,58 +12,33 @@ class RatePage extends StatefulWidget {
 }
 
 class _RatePageState extends State<RatePage> {
-  final List<Map<String, dynamic>> _ratings = [];
+  final List<String> _weeks = [];
   final TextEditingController _weekTitleController = TextEditingController();
   String? _documentId;
 
   @override
   void initState() {
     super.initState();
-    _fetchDocumentId(); // جلب معرف الوثيقة عند بدء الصفحة
+    _documentId = widget.courseId; // استخدم courseId كمستند معرف
+    _loadExistingWeeks(); // تحميل الأسابيع الموجودة عند بدء الصفحة
   }
-
-  Future<void> _fetchDocumentId() async {
-    try {
-      QuerySnapshot snapshot = await FirebaseFirestore.instance
-          .collection('starting_courses')
-          .where('courseId', isEqualTo: widget.courseId)
-          .get();
-
-      if (snapshot.docs.isNotEmpty) {
-        setState(() {
-          _documentId = snapshot.docs.first.id; // الحصول على معرف الوثيقة الأولى المطابقة
-        });
-        _loadExistingRatings(); // تحميل التقييمات الموجودة بعد جلب معرف الوثيقة
-      }
-    } catch (e) {
-      print("Error fetching document ID: $e");
-    }
-  }
-
-  Future<void> _loadExistingRatings() async {
-    // تحميل التقييمات الموجودة من Firestore
+  Future<void> _loadExistingWeeks() async {
     if (_documentId != null) {
       try {
         QuerySnapshot snapshot = await FirebaseFirestore.instance
             .collection('starting_courses')
             .doc(_documentId!)
-            .collection('ratings')
+            .collection('weeks')
             .get();
 
         setState(() {
-          _ratings.addAll(snapshot.docs.map((doc) {
-            return {
-              'title': doc['title'],
-              'rating': doc['rating'],
-            };
-          }).toList());
+          _weeks.addAll(snapshot.docs.map((doc) => doc['title'] as String).toList());
         });
       } catch (e) {
-        print("Error loading ratings: $e");
+        print("Error loading weeks: $e");
       }
     }
   }
-
   void _showAddWeekDialog() {
     showDialog(
       context: context,
@@ -101,11 +77,11 @@ class _RatePageState extends State<RatePage> {
         await FirebaseFirestore.instance
             .collection('starting_courses')
             .doc(_documentId!)
-            .collection('ratings')
-            .add({'title': title, 'rating': 0}); // افتراضياً، التقييم 0
+            .collection('weeks')
+            .add({'title': title});
 
         setState(() {
-          _ratings.add({'title': title, 'rating': 0}); // تحديث الواجهة
+          _weeks.add(title); // تحديث الواجهة
         });
         _weekTitleController.clear(); // مسح حقل الإدخال
       } catch (e) {
@@ -114,106 +90,12 @@ class _RatePageState extends State<RatePage> {
     }
   }
 
-  void _showRatingDialog(String title, int index) {
-    double rating = _ratings[index]['rating'].toDouble();
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15.0),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF980E0E),
-                  const Color(0xFFFF5A5A),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            padding: const EdgeInsets.all(20.0),
-            child: StatefulBuilder(
-              builder: (BuildContext context, StateSetter setState) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Rate $title',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Slider(
-                      value: rating,
-                      min: 0,
-                      max: 5,
-                      divisions: 5,
-                      label: rating.round().toString(),
-                      activeColor: Colors.yellow,
-                      inactiveColor: Colors.grey,
-                      onChanged: (double value) {
-                        setState(() {
-                          rating = value;
-                        });
-                      },
-                    ),
-                    Text(
-                      'Rating: ${rating.round()}',
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: const Text('Cancel', style: TextStyle(color: Colors.white)),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _ratings[index]['rating'] = rating.round();
-                              // حفظ التقييم في Firestore
-                              FirebaseFirestore.instance
-                                  .collection('starting_courses')
-                                  .doc(_documentId!)
-                                  .collection('ratings')
-                                  .where('title', isEqualTo: title)
-                                  .get()
-                                  .then((snapshot) {
-                                if (snapshot.docs.isNotEmpty) {
-                                  snapshot.docs.first.reference.update({'rating': rating.round()});
-                                }
-                              });
-                            });
-                            Navigator.of(context).pop();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            foregroundColor: Colors.black, backgroundColor: Colors.yellow,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20.0),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 20.0),
-                          ),
-                          child: const Text('Submit'),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
+  void _navigateToWeekDetail(String weekTitle) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WeekDetailPage(courseId: _documentId!, weekTitle: weekTitle),
+      ),
     );
   }
 
@@ -221,25 +103,7 @@ class _RatePageState extends State<RatePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [
-              Color(0xFF980E0E),
-              Color(0xFFFF5A5A),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ).createShader(bounds),
-          child: const Text(
-            'Rate',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
+        title: const Text('Manage Weeks'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -249,17 +113,17 @@ class _RatePageState extends State<RatePage> {
       ),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
-        children: _ratings.asMap().entries.map((entry) {
-          int index = entry.key;
-          var rating = entry.value;
-
-          return _buildRatingCard(rating['title'], rating['rating'], index);
+        children: _weeks.map((week) {
+          return GestureDetector(
+            onTap: () => _navigateToWeekDetail(week), // الانتقال إلى صفحة التفاصيل عند الضغط
+            child: _buildWeekCard(week),
+          );
         }).toList(),
       ),
     );
   }
 
-  Widget _buildRatingCard(String title, int rating, int index) {
+  Widget _buildWeekCard(String title) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       elevation: 8,
@@ -269,44 +133,13 @@ class _RatePageState extends State<RatePage> {
       color: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.red,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: List.generate(5, (i) {
-                return Icon(
-                  i < rating ? Icons.star : Icons.star_border,
-                  color: Colors.amber,
-                );
-              }),
-            ),
-            const SizedBox(height: 16),
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  _showRatingDialog(title, index);
-                },
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white, backgroundColor: const Color(0xFF980E0E),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20.0),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 20.0),
-                  elevation: 5,
-                ),
-                child: const Text('Rate Now'),
-              ),
-            ),
-          ],
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.red,
+          ),
         ),
       ),
     );

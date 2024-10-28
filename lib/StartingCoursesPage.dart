@@ -22,12 +22,15 @@ class _StartingCoursesPageState extends State<StartingCoursesPage> {
 
   Future<void> _fetchStartingCourses() async {
     try {
-      QuerySnapshot snapshot = await _firestore.collection('starting_courses').get();
+      QuerySnapshot snapshot = await _firestore
+          .collection('courses') // تأكد من أن اسم المجموعة صحيح
+          .where('isStarted', isEqualTo: true) // تحقق من حقل isStarted
+          .get();
       setState(() {
         startingCourses = snapshot.docs.map((doc) {
           return {
             ...doc.data() as Map<String, dynamic>,
-            'id': doc.id,
+            'id': doc.id, // إضافة معرف الوثيقة
           };
         }).toList();
       });
@@ -35,14 +38,14 @@ class _StartingCoursesPageState extends State<StartingCoursesPage> {
       print("Error fetching starting courses: $e");
     } finally {
       setState(() {
-        isLoading = false;
+        isLoading = false; // إنهاء حالة التحميل
       });
     }
   }
 
   void _navigateToCourseDetails(Map<String, dynamic> course) {
-    // Check if required fields are present
-    final String courseToken = course['courseId'] ?? 'Unknown ID';
+    // تحقق من الحقول المطلوبة
+    final String courseToken = course['id']; // استخدم معرّف الوثيقة
     final String courseName = course['title'] ?? 'Untitled Course';
     final String imageUrl = course['image'] ?? '';
     final String description = course['description'] ?? 'No description available';
@@ -92,7 +95,7 @@ class _StartingCoursesPageState extends State<StartingCoursesPage> {
               title: Text(course['title'] ?? 'Untitled Course'),
               subtitle: Text(course['description'] ?? 'No description available'),
               trailing: const Icon(Icons.arrow_forward),
-              onTap: () => _navigateToCourseDetails(course), // Pass the entire course object
+              onTap: () => _navigateToCourseDetails(course),
             ),
           );
         },

@@ -90,8 +90,9 @@ class CourseDetailsPage extends StatelessWidget {
   Widget _buildAcceptedStudentsList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('registered_accepted')
-          .where('courseId', isEqualTo: courseId)
+          .collection('courses')
+          .doc(courseId)
+          .collection('accepted_students')
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -266,7 +267,8 @@ class CourseDetailsPage extends StatelessWidget {
   }
 
   Future<void> _confirmRegistration(Map<String, dynamic> registration, String registrationId) async {
-    await FirebaseFirestore.instance.collection('registered_accepted').doc(registrationId).set({
+    // نقل البيانات إلى مجموعة accepted_students داخل الدورة
+    await FirebaseFirestore.instance.collection('courses').doc(courseId).collection('accepted_students').doc(registrationId).set({
       'courseId': registration['courseId'],
       'fullName': registration['fullName'],
       'email': registration['email'],
@@ -280,7 +282,11 @@ class CourseDetailsPage extends StatelessWidget {
       'graduationDate': registration['graduationDate'],
       'isGraduated': registration['isGraduated'],
       'age': registration['age'],
+      'institution': registration['institution'],
+      'userToken': registration['userToken'],
     });
+
+    // حذف الطلب من قائمة الطلبات
     await FirebaseFirestore.instance.collection('registration_requests').doc(registrationId).delete();
   }
 

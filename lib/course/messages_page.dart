@@ -5,9 +5,9 @@ class MessagesPage extends StatefulWidget {
   final String courseToken;
 
   const MessagesPage({
-    super.key,
+    Key? key,
     required this.courseToken,
-  });
+  }) : super(key: key);
 
   @override
   _MessagesPageState createState() => _MessagesPageState();
@@ -22,21 +22,22 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   void initState() {
     super.initState();
-    _messagesRef = FirebaseFirestore.instance.collection('starting_courses');
-    _userId = 'user123'; // Replace with the actual user ID
+    _messagesRef = FirebaseFirestore.instance.collection('courses'); // تحديد مجموعة الدورات
+    _userId = 'user123'; // استبدل بـ ID المستخدم الفعلي
     _fetchDocumentId();
   }
 
   Future<void> _fetchDocumentId() async {
     try {
-      QuerySnapshot snapshot = await _messagesRef
-          .where('courseId', isEqualTo: widget.courseToken)
-          .get();
+      DocumentSnapshot snapshot = await _messagesRef.doc(widget.courseToken).get();
 
-      if (snapshot.docs.isNotEmpty) {
+      if (snapshot.exists) {
         setState(() {
-          _documentId = snapshot.docs.first.id; // Get the first matching document ID
+          _documentId = snapshot.id; // احصل على معرف الوثيقة
+          print("Document ID: $_documentId"); // طباعة معرف الوثيقة
         });
+      } else {
+        print("No document found for this course.");
       }
     } catch (e) {
       print("Error fetching document ID: $e");
@@ -47,8 +48,8 @@ class _MessagesPageState extends State<MessagesPage> {
     if (_documentId != null && messageContent.isNotEmpty) {
       try {
         await _messagesRef
-            .doc(_documentId) // Use the fetched document ID
-            .collection('messages')
+            .doc(_documentId) // استخدم معرف الوثيقة الذي تم جلبه
+            .collection('messages') // مجموعة فرعية للرسائل
             .add({
           'sender': _userId,
           'time': FieldValue.serverTimestamp(),
@@ -58,8 +59,10 @@ class _MessagesPageState extends State<MessagesPage> {
 
         _messageController.clear();
       } catch (e) {
-        print("Error sending message: $e");
+        print("Error sending message: $e"); // طباعة الخطأ
       }
+    } else {
+      print("Document ID is null or message is empty."); // إذا كان المعرف أو الرسالة فارغة
     }
   }
 
@@ -77,11 +80,11 @@ class _MessagesPageState extends State<MessagesPage> {
             child: StreamBuilder<QuerySnapshot>(
               stream: _documentId != null
                   ? _messagesRef
-                  .doc(_documentId) // Use the fetched document ID
+                  .doc(_documentId) // استخدم معرف الوثيقة
                   .collection('messages')
                   .orderBy('time')
                   .snapshots()
-                  : Stream.empty(), // Empty stream until document ID is fetched
+                  : Stream.empty(), // تدفق فارغ حتى يتم جلب معرف الوثيقة
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());

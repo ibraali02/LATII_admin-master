@@ -101,8 +101,12 @@ class _AddContentPageState extends State<AddContentPage> {
         'courseId': courseToken, // تخزين courseToken
       };
 
-      // إضافة البيانات إلى Firestore
-      await FirebaseFirestore.instance.collection('course_contents').add(contentData);
+      // إضافة البيانات إلى مجموعة فرعية داخل الدورة
+      await FirebaseFirestore.instance
+          .collection('courses') // اسم المجموعة الرئيسية
+          .doc(courseToken) // استخدام courseToken لتحديد الوثيقة
+          .collection('contents') // إضافة إلى مجموعة فرعية للمحتوى
+          .add(contentData);
 
       // إظهار رسالة نجاح
       ScaffoldMessenger.of(context).showSnackBar(

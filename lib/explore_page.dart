@@ -57,7 +57,6 @@ class _ExplorePageState extends State<ExplorePage> {
           courseId: course['id'],
           courseName: course['title'],
           imageUrl: course['image'],
-
         ),
       ),
     );
@@ -111,21 +110,41 @@ class _ExplorePageState extends State<ExplorePage> {
 
   void _startCourse(Map<String, dynamic> course) async {
     try {
-      // Add the course to the starting_courses collection with the course ID
-      await _firestore.collection('starting_courses').add({
-        'courseId': course['id'], // Save the course token
-        'title': course['title'],
-        'description': course['description'],
-        'image': course['image'],
-        'duration': course['duration'],
-        'location': course['location'],
-        'startedAt': FieldValue.serverTimestamp(), // Save the timestamp when the course was started
+      if (course['isStarted'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This course has already started.')),
+        );
+        return;
+      }
 
-        // Add any other fields you need
-      });
+      CollectionReference courseCollection = _firestore.collection('starting_courses').doc(course['id']).collection('students');
+
+      QuerySnapshot acceptedStudentsSnapshot = await _firestore
+          .collection('courses')
+          .doc(course['id'])
+          .collection('accepted_students')
+          .get();
+
+      for (var studentDoc in acceptedStudentsSnapshot.docs) {
+        await courseCollection.add({
+          'studentId': studentDoc.id,
+          'fullName': studentDoc['fullName'],
+          'email': studentDoc['email'],
+          'phone': studentDoc['phone'],
+          'education': studentDoc['education'],
+          'hasJob': studentDoc['hasJob'],
+          'hasComputer': studentDoc['hasComputer'],
+          'startedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await _firestore.collection('courses').doc(course['id']).update({'isStarted': true});
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Course started successfully!')),
       );
+
+      // تحديث الصفحة بعد بدء الدورة
+      _fetchCourses();
     } catch (e) {
       print("Error starting course: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -362,16 +381,18 @@ class _ExplorePageState extends State<ExplorePage> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: () => _startCourse(course),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF980E0E),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  // شرط لإظهار زر بدء الدورة
+                  if (course['isStarted'] != true)
+                    ElevatedButton(
+                      onPressed: () => _startCourse(course),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF980E0E),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
+                      child: const Text('Start Course'),
                     ),
-                    child: const Text('Start Course'),
-                  ),
                 ],
               ),
             ),
