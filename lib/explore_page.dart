@@ -15,8 +15,10 @@ class _ExplorePageState extends State<ExplorePage> {
   String? selectedCategory;
   final List<Map<String, dynamic>> courses = [];
   bool isLoading = false;
+  bool showOnlyStarted = false;
+  bool showOnlyFinished = false;
+  bool showOnlyUpcoming = false;
   final TextEditingController _searchController = TextEditingController();
-
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
@@ -31,13 +33,22 @@ class _ExplorePageState extends State<ExplorePage> {
     });
     try {
       QuerySnapshot snapshot = await _firestore.collection('courses').get();
+      List<Map<String, dynamic>> allCourses = snapshot.docs.map((doc) {
+        return {
+          ...doc.data() as Map<String, dynamic>,
+          'id': doc.id,
+        };
+      }).toList();
+
       setState(() {
         courses.clear();
-        for (var doc in snapshot.docs) {
-          courses.add({
-            ...doc.data() as Map<String, dynamic>,
-            'id': doc.id,
-          });
+        for (var course in allCourses) {
+          if ((showOnlyStarted && course['isStarted']) ||
+              (showOnlyFinished && course['isFinished']) ||
+              (showOnlyUpcoming && !course['isStarted']) ||
+              (!showOnlyStarted && !showOnlyFinished && !showOnlyUpcoming)) {
+            courses.add(course);
+          }
         }
       });
     } catch (e) {
@@ -56,7 +67,7 @@ class _ExplorePageState extends State<ExplorePage> {
         builder: (context) => CourseDetailsPage(
           courseId: course['id'],
           courseName: course['title'],
-          imageUrl: course['image'],
+          imageUrl: course['imageUrl'],
         ),
       ),
     );
@@ -111,44 +122,26 @@ class _ExplorePageState extends State<ExplorePage> {
   void _startCourse(Map<String, dynamic> course) async {
     try {
       if (course['isStarted'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This course has already started.')),
-        );
-        return;
-      }
-
-      CollectionReference courseCollection = _firestore.collection('starting_courses').doc(course['id']).collection('students');
-
-      QuerySnapshot acceptedStudentsSnapshot = await _firestore
-          .collection('courses')
-          .doc(course['id'])
-          .collection('accepted_students')
-          .get();
-
-      for (var studentDoc in acceptedStudentsSnapshot.docs) {
-        await courseCollection.add({
-          'studentId': studentDoc.id,
-          'fullName': studentDoc['fullName'],
-          'email': studentDoc['email'],
-          'phone': studentDoc['phone'],
-          'education': studentDoc['education'],
-          'hasJob': studentDoc['hasJob'],
-          'hasComputer': studentDoc['hasComputer'],
-          'startedAt': FieldValue.serverTimestamp(),
+        await _firestore.collection('courses').doc(course['id']).update({
+          'isStarted': false,
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Course has been stopped.')),
+        );
+      } else {
+        await _firestore.collection('courses').doc(course['id']).update({
+          'isStarted': true,
+          'startTime': FieldValue.serverTimestamp(),
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Course started successfully!')),
+        );
       }
-
-      await _firestore.collection('courses').doc(course['id']).update({'isStarted': true});
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Course started successfully!')),
-      );
-
-      // تحديث الصفحة بعد بدء الدورة
       _fetchCourses();
     } catch (e) {
-      print("Error starting course: $e");
+      print("Error starting/stopping course: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to start course')),
+        const SnackBar(content: Text('Failed to update course status')),
       );
     }
   }
@@ -181,15 +174,22 @@ class _ExplorePageState extends State<ExplorePage> {
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: 'Search for courses...',
-          prefixIcon: const Icon(Icons.search, color: Color(0xFF980E0E)),
-          filled: true,
-          fillColor: Colors.grey[100],
+          hintText: 'Search courses...',
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: BorderSide.none,
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          suffixIcon: IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              setState(() {
+                String searchText = _searchController.text.toLowerCase();
+                courses.retainWhere((course) =>
+                course['title'].toLowerCase().contains(searchText) ||
+                    course['description'].toLowerCase().contains(searchText));
+              });
+            },
+          ),
         ),
       ),
     );
@@ -286,7 +286,66 @@ class _ExplorePageState extends State<ExplorePage> {
     );
   }
 
+  Widget _buildFilterSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                showOnlyFinished = true;
+                showOnlyStarted = false;
+                showOnlyUpcoming = false;
+              });
+              _fetchCourses();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: showOnlyFinished ? const Color(0xFF980E0E) : Colors.white,
+              foregroundColor: showOnlyFinished ? Colors.white : Colors.black,
+            ),
+            child: const Text('Finished Courses'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                showOnlyUpcoming = true;
+                showOnlyStarted = false;
+                showOnlyFinished = false;
+              });
+              _fetchCourses();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: showOnlyUpcoming ? const Color(0xFF980E0E) : Colors.white,
+              foregroundColor: showOnlyUpcoming ? Colors.white : Colors.black,
+            ),
+            child: const Text('Upcoming Courses'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCourseCard(Map<String, dynamic> course) {
+    Widget statusIcon;
+    Color statusColor;
+    String statusText;
+
+    if (course['isFinished'] == true) {
+      statusIcon = const Icon(Icons.check_circle, color: Color(0xFF980E0E));
+      statusColor = const Color(0xFF980E0E);
+      statusText = 'Finished';
+    } else if (course['isStarted'] == true) {
+      statusIcon = const Icon(Icons.play_circle, color: Color(0xFF980E0E));
+      statusColor = const Color(0xFF980E0E);
+      statusText = 'Started';
+    } else {
+      statusIcon = const Icon(Icons.access_time, color: Color(0xFF980E0E));
+      statusColor = const Color(0xFF980E0E);
+      statusText = 'Upcoming';
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -308,7 +367,7 @@ class _ExplorePageState extends State<ExplorePage> {
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               child: Image.network(
-                course['image'] ?? 'https://via.placeholder.com/400x200',
+                course['imageUrl'] ?? 'https://via.placeholder.com/400x200',
                 height: 160,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -342,14 +401,14 @@ class _ExplorePageState extends State<ExplorePage> {
                       ),
                       Row(
                         children: [
-                          _actionButtonWithIcon(
-                            Icons.edit,
-                                () => _editCourse(course),
-                          ),
-                          const SizedBox(width: 8),
-                          _actionButtonWithIcon(
-                            Icons.delete,
-                                () => _showDeleteConfirmationDialog(course['id']),
+                          statusIcon,
+                          const SizedBox(width: 4),
+                          Text(
+                            statusText,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
@@ -381,18 +440,28 @@ class _ExplorePageState extends State<ExplorePage> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // شرط لإظهار زر بدء الدورة
-                  if (course['isStarted'] != true)
-                    ElevatedButton(
-                      onPressed: () => _startCourse(course),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF980E0E),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text('Start Course'),
+                  // عرض السعر
+                  Text(
+                    (course['price'] == 0 || course['price'] == null)
+                        ? 'Free'
+                        : '\$${course['price']}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (!(course['isStarted'] == true || course['isFinished'] == true))
+                        _actionButtonWithIcon(Icons.play_arrow, () => _startCourse(course)),
+                      _actionButtonWithIcon(Icons.edit, () => _editCourse(course)),
+                      _actionButtonWithIcon(Icons.delete, () => _showDeleteConfirmationDialog(course['id'])),
+
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -406,49 +475,34 @@ class _ExplorePageState extends State<ExplorePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Explore Courses', style: TextStyle(color: Colors.white)),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF980E0E), Color(0xFF330000)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          _buildSearchBar(),
-          _buildCategorySection(),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 80),
-              itemCount: courses.length,
-              itemBuilder: (context, index) => _buildCourseCard(courses[index]),
-            ),
+        title: const Text('Explore Courses'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddCoursePage()),
+              );
+            },
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AddCoursePage()),
-          );
-          if (result == true) {
-            _fetchCourses();
-          }
-        },
-        label: const Text(
-          'Add Course',
-          style: TextStyle(color: Colors.white),
-        ),
-        icon: const Icon(Icons.add, color: Colors.white),
-        backgroundColor: const Color(0xFF980E0E),
+      body: Column(
+        children: [
+          _buildCategorySection(),
+          _buildFilterSection(),
+          Expanded(
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+              itemCount: courses.length,
+              itemBuilder: (context, index) {
+                return _buildCourseCard(courses[index]);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

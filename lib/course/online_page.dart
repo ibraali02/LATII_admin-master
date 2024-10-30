@@ -8,24 +8,28 @@ class OnlinePage extends StatefulWidget {
 }
 
 class _OnlinePageState extends State<OnlinePage> {
-  final List<String> _comments = [
-    'Ibrahim Al-Sanousi: This is a great session!',
-    'Ali Ayad: I learned a lot from this course.',
-  ];
-  final TextEditingController _commentController = TextEditingController();
-
-  void _addComment() {
-    if (_commentController.text.isNotEmpty) {
-      setState(() {
-        _comments.add('You: ${_commentController.text}');
-        _commentController.clear(); // مسح حقل الإدخال
-      });
-    }
-  }
-
   void _startLiveStream() {
-    // هنا يمكنك إضافة الوظيفة لبدء البث المباشر
-    print('Starting live stream...'); // مثال على وظيفة
+    // إظهار مربع حوار لتأكيد بدء البث المباشر
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Start Live Stream'),
+          content: const Text(
+            'Please open the live stream from a desktop device connected to a camera. '
+                'You will be allowed to start the stream from any device in future updates.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop(); // إغلاق مربع الحوار
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -43,123 +47,25 @@ class _OnlinePageState extends State<OnlinePage> {
             end: Alignment.bottomRight,
           ).createShader(bounds),
           child: AppBar(
-            title: const Text('Online'),
+            title: const Text('Live Course'), // تغيير عنوان الصفحة
             backgroundColor: Colors.transparent, // جعل الخلفية شفافة
             elevation: 0,
+            automaticallyImplyLeading: false, // إزالة زر الرجوع
           ),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16.0),
-              children: [
-                _buildLiveStream(), // استبدال الفيديو بالصورة
-                const SizedBox(height: 20),
-                const Text(
-                  'Comments',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                ..._comments.map((comment) => _buildCommentCard(comment)).toList(),
-              ],
-            ),
+      body: Center(
+        child: ElevatedButton(
+          onPressed: _startLiveStream, // تنفيذ الوظيفة عند الضغط على الزر
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange, // لون الزر
+            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15), // مساحة padding
           ),
-          _buildCommentInput(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLiveStream() {
-    return GestureDetector(
-      onTap: _startLiveStream, // عند الضغط على الصورة، يمكنك بدء البث المباشر
-      child: Card(
-        elevation: 4,
-        margin: const EdgeInsets.symmetric(vertical: 8.0),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10.0),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Image.asset(
-                'images/img_3.png', // استخدام مسار الصورة
-                fit: BoxFit.cover,
-                height: 200, // ضبط ارتفاع الصورة
-                width: double.infinity, // ضبط العرض ليملأ العنصر
-              ),
-              Positioned(
-                child: ElevatedButton(
-                  onPressed: _startLiveStream, // تنفيذ الوظيفة عند الضغط على الزر
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange, // لون الزر
-                    shape: const CircleBorder(), // شكل دائري
-                    padding: const EdgeInsets.all(20), // مساحة padding
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow, // رمز التشغيل
-                    size: 30,
-                    color: Colors.white, // لون أيقونة التشغيل
-                  ),
-                ),
-              ),
-            ],
+          child: const Text(
+            'Start Live Stream',
+            style: TextStyle(fontSize: 20, color: Colors.white), // نص الزر
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildCommentCard(String comment) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Color(0xFF980E0E), // اللون الأحمر الداكن
-              Color(0xFFFF5A5A), // اللون الأحمر الفاتح
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(10.0), // إضافة زوايا دائرية
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            comment,
-            style: const TextStyle(color: Colors.white), // لون النص أبيض
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCommentInput() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _commentController,
-              decoration: InputDecoration(
-                hintText: 'Add a comment...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.0),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 16.0),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.send, color: Colors.blue),
-            onPressed: _addComment,
-          ),
-        ],
       ),
     );
   }

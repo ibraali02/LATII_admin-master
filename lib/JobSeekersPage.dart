@@ -40,6 +40,44 @@ class _JobSeekersPageState extends State<JobSeekersPage> {
     }
   }
 
+  Future<void> _deleteJobSeeker(String id) async {
+    try {
+      await _firestore.collection('job_seekers_accepted').doc(id).delete();
+      _fetchJobSeekers();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error deleting job seeker: $e')),
+      );
+    }
+  }
+
+  void _confirmDelete(String id) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Deletion'),
+          content: const Text('Are you sure you want to delete this job seeker?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Delete'),
+              onPressed: () {
+                _deleteJobSeeker(id);
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -228,7 +266,7 @@ class _JobSeekersPageState extends State<JobSeekersPage> {
                             ),
                           ),
                           Text(
-                            data['city'] as String? ?? "غير متو فر",
+                            data['city'] as String? ?? "غير متوفر",
                             style: TextStyle(
                               fontSize: 16,
                               color: Color(0xFF330000),
@@ -237,20 +275,12 @@ class _JobSeekersPageState extends State<JobSeekersPage> {
                         ],
                       ),
                     ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Color(0xFF980E0E)),
+                      onPressed: () => _confirmDelete(seeker.id),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 16),
-               /* ElevatedButton(
-                  onPressed: () {
-                    // Implement edit functionality
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF980E0E),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 40),
-                  ),
-                  child: const Text('Edit'),
-                ),*/
                 const SizedBox(height: 16),
                 Text(
                   'About',

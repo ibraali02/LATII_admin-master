@@ -23,14 +23,15 @@ class _StartingCoursesPageState extends State<StartingCoursesPage> {
   Future<void> _fetchStartingCourses() async {
     try {
       QuerySnapshot snapshot = await _firestore
-          .collection('courses') // تأكد من أن اسم المجموعة صحيح
-          .where('isStarted', isEqualTo: true) // تحقق من حقل isStarted
+          .collection('courses')
+          .where('isStarted', isEqualTo: true)
+          .where('isFinished', isEqualTo: false)
           .get();
       setState(() {
         startingCourses = snapshot.docs.map((doc) {
           return {
             ...doc.data() as Map<String, dynamic>,
-            'id': doc.id, // إضافة معرف الوثيقة
+            'id': doc.id,
           };
         }).toList();
       });
@@ -38,14 +39,13 @@ class _StartingCoursesPageState extends State<StartingCoursesPage> {
       print("Error fetching starting courses: $e");
     } finally {
       setState(() {
-        isLoading = false; // إنهاء حالة التحميل
+        isLoading = false;
       });
     }
   }
 
   void _navigateToCourseDetails(Map<String, dynamic> course) {
-    // تحقق من الحقول المطلوبة
-    final String courseToken = course['id']; // استخدم معرّف الوثيقة
+    final String courseToken = course['id'];
     final String courseName = course['title'] ?? 'Untitled Course';
     final String imageUrl = course['image'] ?? '';
     final String description = course['description'] ?? 'No description available';
@@ -67,11 +67,52 @@ class _StartingCoursesPageState extends State<StartingCoursesPage> {
     );
   }
 
+  void _finishCourse(String courseId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('تأكيد إنهاء الكورس'),
+          content: const Text('هل أنت متأكد أنك تريد إنهاء هذا الكورس؟'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // إغلاق الحوار
+              },
+              child: const Text('إلغاء'),
+            ),
+            TextButton(
+              onPressed: () async {
+                try {
+                  await _firestore.collection('courses').doc(courseId).update({
+                    'isFinished': true,
+                  });
+                  Navigator.of(context).pop(); // إغلاق الحوار
+                  _fetchStartingCourses(); // تحديث قائمة الكورسات
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('تم إنهاء الكورس بنجاح!')),
+                  );
+                } catch (e) {
+                  print("Error updating course: $e");
+                  Navigator.of(context).pop(); // إغلاق الحوار
+                }
+              },
+              child: const Text('نعم'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Starting Courses'),
+        title: const Text(
+          'Starting Courses',
+          style: TextStyle(color: Colors.white), // تغيير لون النص إلى الأبيض
+        ),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -81,9 +122,12 @@ class _StartingCoursesPageState extends State<StartingCoursesPage> {
             ),
           ),
         ),
+        automaticallyImplyLeading: false, // إزالة زر الرجوع
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
+          : startingCourses.isEmpty
+          ? const Center(child: Text('لا توجد كورسات مبدوءة حالياً'))
           : ListView.builder(
         itemCount: startingCourses.length,
         itemBuilder: (context, index) {
@@ -94,8 +138,19 @@ class _StartingCoursesPageState extends State<StartingCoursesPage> {
               contentPadding: const EdgeInsets.all(16),
               title: Text(course['title'] ?? 'Untitled Course'),
               subtitle: Text(course['description'] ?? 'No description available'),
-              trailing: const Icon(Icons.arrow_forward),
-              onTap: () => _navigateToCourseDetails(course),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton(
+                    onPressed: () => _navigateToCourseDetails(course),
+                    child: const Text('التفاصيل'), // زر تفاصيل
+                  ),
+                  TextButton(
+                    onPressed: () => _finishCourse(course['id']),
+                    child: const Text('إنهاء الكورس'), // زر إنهاء الكورس
+                  ),
+                ],
+              ),
             ),
           );
         },

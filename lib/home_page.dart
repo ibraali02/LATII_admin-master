@@ -262,7 +262,6 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.only(top: 200.0),
             child: ListView(
               children: [
-                _searchField(),
                 const SizedBox(height: 20),
                 _postInput(),
                 const SizedBox(height: 20),
@@ -298,7 +297,7 @@ class _HomePageState extends State<HomePage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Welcome, Jason 👋',
+                  'Welcome, LATI',
                   style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 Row(
@@ -326,30 +325,13 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             const SizedBox(height: 20),
-            const Text(
-              'What do you want to learn?',
-              style: TextStyle(color: Colors.white, fontSize: 18),
-            ),
+
           ],
         ),
       ),
     );
   }
 
-  Widget _searchField() {
-    return TextField(
-      decoration: InputDecoration(
-        hintText: 'Search...',
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30.0),
-          borderSide: BorderSide.none,
-        ),
-        prefixIcon: const Icon(Icons.search),
-      ),
-    );
-  }
 
   Widget _postInput() {
     return GestureDetector(

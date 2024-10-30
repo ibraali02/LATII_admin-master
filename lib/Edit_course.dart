@@ -19,6 +19,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
   String description = '';
   String? category;
   String duration = '';
+  String price = ''; // إضافة متغير السعر
   File? _image;
   final picker = ImagePicker();
 
@@ -39,6 +40,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
     description = widget.course['description'] ?? '';
     category = widget.course['category'] ?? categories.first;
     duration = widget.course['duration'] ?? '';
+    price = widget.course['price']?.toString() ?? ''; // تعيين السعر الافتراضي
   }
 
   void _selectImage() async {
@@ -64,6 +66,7 @@ class _EditCoursePageState extends State<EditCoursePage> {
       'description': description,
       'category': category,
       'duration': duration,
+      'price': double.tryParse(price), // تحديث السعر
       'imageUrl': imageUrl,
     });
 
@@ -159,6 +162,15 @@ class _EditCoursePageState extends State<EditCoursePage> {
                                 duration = value;
                               },
                               icon: Icons.timer,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildTextField(
+                              label: 'Course Price', // حقل السعر
+                              initialValue: price,
+                              onChanged: (value) {
+                                price = value;
+                              },
+                              icon: Icons.money,
                             ),
                             const SizedBox(height: 16),
                             DropdownButtonFormField<String>(

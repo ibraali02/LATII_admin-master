@@ -17,6 +17,7 @@ class _AddCoursePageState extends State<AddCoursePage> {
   String description = '';
   String? category;
   String duration = '';
+  String price = ''; // إضافة متغير السعر
   File? _image;
   final picker = ImagePicker();
 
@@ -56,6 +57,9 @@ class _AddCoursePageState extends State<AddCoursePage> {
         'publishedDate': FieldValue.serverTimestamp(),
         'imageUrl': imageUrl,
         'duration': duration,
+        'price': price, // إضافة السعر إلى البيانات المرسلة
+        'isStarted': false, // تعيين isStarted إلى false
+        'isFinished': false, // تعيين isFinished إلى false
       });
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -168,6 +172,14 @@ class _AddCoursePageState extends State<AddCoursePage> {
                                 duration = value;
                               },
                               icon: Icons.timer,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildTextField(
+                              label: 'Course Price',
+                              onChanged: (value) {
+                                price = value; // تحديث السعر
+                              },
+                              icon: Icons.attach_money,
                             ),
                             const SizedBox(height: 16),
                             DropdownButtonFormField<String>(

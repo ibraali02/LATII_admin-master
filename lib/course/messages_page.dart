@@ -22,8 +22,8 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   void initState() {
     super.initState();
-    _messagesRef = FirebaseFirestore.instance.collection('courses'); // تحديد مجموعة الدورات
-    _userId = 'user123'; // استبدل بـ ID المستخدم الفعلي
+    _messagesRef = FirebaseFirestore.instance.collection('courses');
+    _userId = 'user123'; // Replace with actual user ID
     _fetchDocumentId();
   }
 
@@ -33,8 +33,8 @@ class _MessagesPageState extends State<MessagesPage> {
 
       if (snapshot.exists) {
         setState(() {
-          _documentId = snapshot.id; // احصل على معرف الوثيقة
-          print("Document ID: $_documentId"); // طباعة معرف الوثيقة
+          _documentId = snapshot.id;
+          print("Document ID: $_documentId");
         });
       } else {
         print("No document found for this course.");
@@ -48,8 +48,8 @@ class _MessagesPageState extends State<MessagesPage> {
     if (_documentId != null && messageContent.isNotEmpty) {
       try {
         await _messagesRef
-            .doc(_documentId) // استخدم معرف الوثيقة الذي تم جلبه
-            .collection('messages') // مجموعة فرعية للرسائل
+            .doc(_documentId)
+            .collection('messages')
             .add({
           'sender': _userId,
           'time': FieldValue.serverTimestamp(),
@@ -59,11 +59,21 @@ class _MessagesPageState extends State<MessagesPage> {
 
         _messageController.clear();
       } catch (e) {
-        print("Error sending message: $e"); // طباعة الخطأ
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error sending message: $e")),
+        );
       }
     } else {
-      print("Document ID is null or message is empty."); // إذا كان المعرف أو الرسالة فارغة
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Document ID is null or message is empty.")),
+      );
     }
+  }
+
+  String _formatTime(Timestamp? timestamp) {
+    if (timestamp == null) return '';
+    final date = timestamp.toDate();
+    return "${date.hour}:${date.minute.toString().padLeft(2, '0')}";
   }
 
   @override
@@ -80,11 +90,11 @@ class _MessagesPageState extends State<MessagesPage> {
             child: StreamBuilder<QuerySnapshot>(
               stream: _documentId != null
                   ? _messagesRef
-                  .doc(_documentId) // استخدم معرف الوثيقة
+                  .doc(_documentId)
                   .collection('messages')
                   .orderBy('time')
                   .snapshots()
-                  : Stream.empty(), // تدفق فارغ حتى يتم جلب معرف الوثيقة
+                  : Stream.empty(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -102,7 +112,7 @@ class _MessagesPageState extends State<MessagesPage> {
                   final data = doc.data() as Map<String, dynamic>;
                   return Message(
                     sender: data['sender'] == _userId ? 'You' : data['sender'],
-                    time: (data['time'] as Timestamp?)?.toDate().toLocal().toString().substring(10, 15) ?? '',
+                    time: _formatTime(data['time'] as Timestamp?),
                     content: data['content'] ?? '',
                   );
                 }).toList();
