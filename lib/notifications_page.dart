@@ -35,7 +35,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _firestore.collection('job_seekers').orderBy('timestamp', descending: true).snapshots(),
+        stream: _firestore.collection('job_seekers').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -79,8 +79,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
           'age': document.data()['age'],
           'city': document.data()['city'],
           'courses': document.data()['courses'],
-          'cv': document.data()['cv'],
+          'cv_image': document.data()['cv_image'], // إضافة الحقل
           'email': document.data()['email'],
+          'gender': document.data()['gender'], // إضافة الحقل
           'graduate': document.data()['graduate'],
           'image': document.data()['image'],
           'phone': document.data()['phone'],
@@ -156,12 +157,23 @@ class _NotificationsPageState extends State<NotificationsPage> {
       await _firestore.collection('job_seekers').doc(notificationId).get();
 
       if (requestDoc.exists) {
+        // حفظ جميع البيانات في job_seekers_accepted
         await _firestore.collection('job_seekers_accepted').add({
           'name': requestDoc.data()?['name'],
-          'courseId': requestDoc.data()?['courseId'],
+          'age': requestDoc.data()?['age'],
+          'city': requestDoc.data()?['city'],
+          'courses': requestDoc.data()?['courses'],
+          'cv_image': requestDoc.data()?['cv_image'],
+          'email': requestDoc.data()?['email'],
+          'gender': requestDoc.data()?['gender'],
+          'graduate': requestDoc.data()?['graduate'],
+          'image': requestDoc.data()?['image'],
+          'phone': requestDoc.data()?['phone'],
+          'university': requestDoc.data()?['university'],
           'timestamp': FieldValue.serverTimestamp(),
         });
 
+        // حذف الإشعار بعد قبوله
         await _firestore.collection('job_seekers').doc(notificationId).delete();
 
         ScaffoldMessenger.of(context).showSnackBar(
