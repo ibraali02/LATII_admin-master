@@ -32,11 +32,11 @@ class CourseDetailsPage extends StatelessWidget {
           child: CustomScrollView(
             slivers: [
               SliverAppBar(
-                expandedHeight: 300.0, // زيادة ارتفاع شريط التطبيق
+                expandedHeight: 300.0,
                 floating: false,
                 pinned: true,
                 backgroundColor: const Color(0xFF980E0E),
-                iconTheme: const IconThemeData(color: Colors.white), // لون زر الرجوع أبيض
+                iconTheme: const IconThemeData(color: Colors.white),
                 flexibleSpace: FlexibleSpaceBar(
                   background: Column(
                     children: [
@@ -51,7 +51,7 @@ class CourseDetailsPage extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8), // مساحة إضافية بين العنوان والصورة
+                      const SizedBox(height: 8),
                       Expanded(
                         child: imageUrl != null && imageUrl!.isNotEmpty
                             ? Image.network(
@@ -85,6 +85,9 @@ class CourseDetailsPage extends StatelessWidget {
                     children: [
                       _buildSectionTitle('Accepted Students'),
                       _buildAcceptedStudentsList(),
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Registration Requests'),
+                      _buildRegistrationRequestsList(),
                       const SizedBox(height: 24),
                       _buildSectionTitle('Previous Videos'),
                       _buildPreviousVideosList(),
@@ -154,7 +157,7 @@ class CourseDetailsPage extends StatelessWidget {
       ),
       elevation: 4,
       color: Colors.white.withOpacity(0.1),
-      child: ExpansionTile(
+      child: ListTile(
         title: Text(
           'Name: ${student['fullName']?.toString() ?? 'No Name'}',
           style: const TextStyle(color: Colors.white),
@@ -163,23 +166,102 @@ class CourseDetailsPage extends StatelessWidget {
           'Email: ${student['email']?.toString() ?? 'No Email'}',
           style: const TextStyle(color: Colors.white70),
         ),
-        iconColor: Colors.white,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildInfoRow('Phone', student['phone']?.toString() ?? 'No Phone'),
-                _buildInfoRow('Education', student['education']?.toString() ?? 'N/A'),
-                _buildInfoRow('Has Job', (student['hasJob'] as bool?) == true ? 'Yes' : 'No'),
-                _buildInfoRow('Has Computer', (student['hasComputer'] as bool?) == true ? 'Yes' : 'No'),
-              ],
-            ),
-          ),
-        ],
+        trailing: IconButton(
+          icon: const Icon(Icons.delete, color: Colors.red),
+          onPressed: () => _deleteAcceptedStudent(student['id']), // حذف الطالب
+        ),
       ),
     );
+  }
+
+  Future<void> _deleteAcceptedStudent(String studentId) async {
+    await FirebaseFirestore.instance
+        .collection('courses')
+        .doc(courseId)
+        .collection('accepted_students')
+        .doc(studentId)
+        .delete(); // حذف الطالب من المقبولين
+  }
+
+  Widget _buildRegistrationRequestsList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('registration_requests')
+          .where('courseId', isEqualTo: courseId) // تصفية الطلبات بناءً على courseId
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return const Center(child: Text('Error loading registration requests'));
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text('No registration requests available', style: TextStyle(color: Colors.white)));
+        }
+
+        final registrationRequests = snapshot.data!.docs;
+
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: registrationRequests.length,
+          itemBuilder: (context, index) {
+            final request = registrationRequests[index].data() as Map<String, dynamic>;
+            return _buildRequestCard(request);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRequestCard(Map<String, dynamic> request) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      elevation: 4,
+      color: Colors.white.withOpacity(0.1),
+      child: ListTile(
+        title: Text(
+          'Name: ${request['fullName']?.toString() ?? 'No Name'}',
+          style: const TextStyle(color: Colors.white),
+        ),
+        subtitle: Text(
+          'Email: ${request['email']?.toString() ?? 'No Email'}',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.check, color: Colors.green),
+          onPressed: () => _approveRequest(request), // استخدام دالة جديدة لقبول الطلب
+        ),
+      ),
+    );
+  }
+
+  Future<void> _approveRequest(Map<String, dynamic> request) async {
+    final studentId = request['id']; // تأكد من أن لديك معرف الطالب
+    final studentData = {
+      'id': studentId,
+      'fullName': request['fullName'],
+      'email': request['email'],
+      'userToken': request['userToken'], // نقل userToken
+      // أضف أي معلومات أخرى تحتاجها
+    };
+
+    await FirebaseFirestore.instance
+        .collection('courses')
+        .doc(courseId)
+        .collection('accepted_students')
+        .doc(studentId)
+        .set(studentData); // إضافة الطالب إلى المقبولين
+
+    // حذف الطالب من طلبات التسجيل
+    await FirebaseFirestore.instance
+        .collection('registration_requests')
+        .doc(studentId)
+        .delete();
   }
 
   Widget _buildPreviousVideosList() {
@@ -221,26 +303,6 @@ class CourseDetailsPage extends StatelessWidget {
           },
         );
       },
-    );
-  }
-
-  Widget _buildInfoRow(String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            value,
-            style: const TextStyle(color: Colors.white),
-          ),
-        ],
-      ),
     );
   }
 }

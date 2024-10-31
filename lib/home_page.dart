@@ -44,7 +44,6 @@ class _HomePageState extends State<HomePage> {
         'content': _postController.text,
         'likes': 0,
         'comments': 0,
-        'shares': 0,
       };
 
       if (_location != null) {
@@ -79,7 +78,6 @@ class _HomePageState extends State<HomePage> {
       newsItem['likes']++;
     });
     _updatePostInFirestore(newsItem);
-    print('Liked post: ${newsItem['title']}');
   }
 
   void _commentPost(Map<String, dynamic> newsItem) {
@@ -87,19 +85,44 @@ class _HomePageState extends State<HomePage> {
       newsItem['comments']++;
     });
     _updatePostInFirestore(newsItem);
-    print('Commented on post: ${newsItem['title']}');
-  }
-
-  void _sharePost(Map<String, dynamic> newsItem) {
-    setState(() {
-      newsItem['shares']++;
-    });
-    _updatePostInFirestore(newsItem);
-    print('Shared post: ${newsItem['title']}');
   }
 
   Future<void> _updatePostInFirestore(Map<String, dynamic> newsItem) async {
     await _firestore.collection('posts').doc(newsItem['id']).update(newsItem);
+  }
+
+  Future<void> _deletePost(Map<String, dynamic> newsItem) async {
+    await _firestore.collection('posts').doc(newsItem['id']).delete();
+    setState(() {
+      _news.remove(newsItem);
+    });
+  }
+
+  void _confirmDeletePost(Map<String, dynamic> newsItem) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('تأكيد الحذف'),
+          content: const Text('هل أنت متأكد أنك تريد حذف هذا البوست؟'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // إغلاق الحوار
+              },
+              child: const Text('إلغاء'),
+            ),
+            TextButton(
+              onPressed: () {
+                _deletePost(newsItem);
+                Navigator.of(context).pop(); // إغلاق الحوار
+              },
+              child: const Text('حذف'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showForm() {
@@ -122,7 +145,7 @@ class _HomePageState extends State<HomePage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Create post',
+                        'إنشاء بوست',
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       IconButton(
@@ -136,12 +159,12 @@ class _HomePageState extends State<HomePage> {
                     leading: const CircleAvatar(
                       backgroundImage: NetworkImage('https://via.placeholder.com/150'),
                     ),
-                    title: const Text(' Doe'),
+                    title: const Text('Doe'),
                     subtitle: Row(
                       children: [
                         ElevatedButton.icon(
                           icon: const Icon(Icons.public, size: 16),
-                          label: const Text('Public'),
+                          label: const Text('عام'),
                           onPressed: () {},
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.grey[300],
@@ -151,7 +174,7 @@ class _HomePageState extends State<HomePage> {
                         const SizedBox(width: 8),
                         ElevatedButton.icon(
                           icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Album'),
+                          label: const Text('ألبوم'),
                           onPressed: () {},
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.grey[300],
@@ -165,7 +188,7 @@ class _HomePageState extends State<HomePage> {
                     child: TextField(
                       controller: _postController,
                       decoration: const InputDecoration(
-                        hintText: "What's on your mind?",
+                        hintText: "ماذا يدور في ذهنك؟",
                         border: InputBorder.none,
                       ),
                       maxLines: null,
@@ -185,15 +208,15 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildActionButton(Icons.image, 'Photo', Colors.green, () async {
+                      _buildActionButton(Icons.image, 'صورة', Colors.green, () async {
                         final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
                         setState(() {
                           _image = pickedFile;
                         });
                       }),
-                      _buildActionButton(Icons.person, 'Tag People', Colors.blue, () {}),
-                      _buildActionButton(Icons.emoji_emotions, 'Feeling', Colors.yellow, () {}),
-                      _buildActionButton(Icons.location_on, 'Check in', Colors.red, () async {
+                      _buildActionButton(Icons.person, 'تاج أشخاص', Colors.blue, () {}),
+                      _buildActionButton(Icons.emoji_emotions, 'شعور', Colors.yellow, () {}),
+                      _buildActionButton(Icons.location_on, 'تحديد الموقع', Colors.red, () async {
                         Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
                         setState(() {
                           _location = 'Lat: ${position.latitude}, Lon: ${position.longitude}';
@@ -214,16 +237,16 @@ class _HomePageState extends State<HomePage> {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(1.0), // Optional: for rounded corners
+                        borderRadius: BorderRadius.circular(1.0),
                       ),
                       child: ElevatedButton(
-                        child: const Text('Post'),
+                        child: const Text('نشر'),
                         onPressed: () {
                           _addPost();
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent, // Make background transparent
+                          backgroundColor: Colors.transparent,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
@@ -297,7 +320,7 @@ class _HomePageState extends State<HomePage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Welcome, LATI',
+                  'مرحبًا، LATI',
                   style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 Row(
@@ -325,13 +348,11 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             const SizedBox(height: 20),
-
           ],
         ),
       ),
     );
   }
-
 
   Widget _postInput() {
     return GestureDetector(
@@ -352,7 +373,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(width: 16),
             const Expanded(
               child: Text(
-                'Add a post...',
+                'أضف بوست...',
                 style: TextStyle(color: Colors.grey),
               ),
             ),
@@ -361,6 +382,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
   Widget _newsSection() {
     return Column(
       children: _news.map((newsItem) {
@@ -385,9 +407,21 @@ class _HomePageState extends State<HomePage> {
                     const Icon(Icons.public, size: 12),
                   ],
                 ),
-                trailing: IconButton(
+                trailing: PopupMenuButton<String>(
                   icon: const Icon(Icons.more_horiz),
-                  onPressed: () {},
+                  onSelected: (value) {
+                    if (value == 'delete') {
+                      _confirmDeletePost(newsItem);
+                    }
+                  },
+                  itemBuilder: (BuildContext context) {
+                    return [
+                      const PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Text('حذف'),
+                      ),
+                    ];
+                  },
                 ),
               ),
               Padding(
@@ -424,9 +458,6 @@ class _HomePageState extends State<HomePage> {
                   }),
                   _buildPostAction(Icons.comment_outlined, 'Comment (${newsItem['comments'] ?? '0'})', () {
                     _commentPost(newsItem);
-                  }),
-                  _buildPostAction(Icons.share_outlined, 'Share (${newsItem['shares'] ?? '0'})', () {
-                    _sharePost(newsItem);
                   }),
                 ],
               ),

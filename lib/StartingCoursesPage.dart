@@ -68,12 +68,28 @@ class _StartingCoursesPageState extends State<StartingCoursesPage> {
   }
 
   void _finishCourse(String courseId) {
+    final TextEditingController priceController = TextEditingController(); // للتحكم في حقل السعر
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('تأكيد إنهاء الكورس'),
-          content: const Text('هل أنت متأكد أنك تريد إنهاء هذا الكورس؟'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('هل أنت متأكد أنك تريد إنهاء هذا الكورس؟'),
+              const SizedBox(height: 20),
+              TextField(
+                controller: priceController,
+                decoration: const InputDecoration(
+                  labelText: 'سعر الكورس',
+                  hintText: 'أدخل سعر الكورس',
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () {
@@ -83,18 +99,26 @@ class _StartingCoursesPageState extends State<StartingCoursesPage> {
             ),
             TextButton(
               onPressed: () async {
-                try {
-                  await _firestore.collection('courses').doc(courseId).update({
-                    'isFinished': true,
-                  });
-                  Navigator.of(context).pop(); // إغلاق الحوار
-                  _fetchStartingCourses(); // تحديث قائمة الكورسات
+                final String price = priceController.text.trim();
+                if (price.isNotEmpty) {
+                  try {
+                    await _firestore.collection('courses').doc(courseId).update({
+                      'isFinished': true,
+                      'price': double.tryParse(price), // إضافة سعر الكورس
+                    });
+                    Navigator.of(context).pop(); // إغلاق الحوار
+                    _fetchStartingCourses(); // تحديث قائمة الكورسات
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('تم إنهاء الكورس بنجاح!')),
+                    );
+                  } catch (e) {
+                    print("Error updating course: $e");
+                    Navigator.of(context).pop(); // إغلاق الحوار
+                  }
+                } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('تم إنهاء الكورس بنجاح!')),
+                    const SnackBar(content: Text('يرجى إدخال سعر الكورس')),
                   );
-                } catch (e) {
-                  print("Error updating course: $e");
-                  Navigator.of(context).pop(); // إغلاق الحوار
                 }
               },
               child: const Text('نعم'),
